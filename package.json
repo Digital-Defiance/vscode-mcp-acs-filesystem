@@ -1,0 +1,68 @@
+{
+  "name": "mcp-acs-filesystem",
+  "displayName": "MCP ACS Filesystem Manager",
+  "description": "Advanced filesystem operations for AI agents with MCP integration. Part of the Digital Defiance AI Capabilities Suite.",
+  "version": "0.1.1",
+  "packageManager": "yarn@4.12.0",
+  "publisher": "DigitalDefiance",
+  "engines": {
+    "vscode": "^1.105.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "filesystem",
+    "mcp",
+    "mcp-server",
+    "ai-agent",
+    "copilot",
+    "file-management"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mcp-filesystem.configureMcp",
+        "title": "MCP Filesystem: Add to Copilot MCP Servers"
+      }
+    ],
+    "configuration": {
+      "title": "MCP Filesystem Manager",
+      "properties": {
+        "mcp-filesystem.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start MCP server when VS Code opens"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package --no-dependencies",
+    "publish": "vsce publish --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.96.0",
+    "@vscode/vsce": "^3.7.1",
+    "esbuild": "^0.27.1",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@ai-capabilities-suite/vscode-shared-status-bar": "^1.0.12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/digital-defiance/ai-capabilities-suite.git",
+    "directory": "packages/vscode-mcp-acs-filesystem"
+  },
+  "license": "MIT"
+}
