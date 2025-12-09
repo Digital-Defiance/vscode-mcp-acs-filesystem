@@ -4,6 +4,7 @@ const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
 
 async function main() {
+  // Build extension
   const ctx = await esbuild.context({
     entryPoints: ["src/extension.ts"],
     bundle: true,
@@ -20,11 +21,29 @@ async function main() {
       esbuildProblemMatcherPlugin,
     ],
   });
+
+  // Build test files
+  const testCtx = await esbuild.context({
+    entryPoints: ["src/test/runTest.ts", "src/test/suite/*.test.ts"],
+    bundle: true,
+    format: "cjs",
+    minify: false,
+    sourcemap: true,
+    sourcesContent: false,
+    platform: "node",
+    outdir: "out/test",
+    external: ["vscode", "mocha"],
+    logLevel: "silent",
+  });
+
   if (watch) {
     await ctx.watch();
+    await testCtx.watch();
   } else {
     await ctx.rebuild();
+    await testCtx.rebuild();
     await ctx.dispose();
+    await testCtx.dispose();
   }
 }
 
