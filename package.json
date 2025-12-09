@@ -1,15 +1,17 @@
 {
   "name": "mcp-acs-filesystem",
   "displayName": "MCP ACS Filesystem Manager",
-  "description": "Advanced filesystem operations for AI agents with MCP integration. Part of the Digital Defiance AI Capabilities Suite.",
-  "version": "0.1.2",
+  "description": "Advanced filesystem operations for AI agents with MCP integration and security boundaries. Part of the Digital Defiance AI Capabilities Suite.",
+  "version": "0.1.0",
   "packageManager": "yarn@4.12.0",
   "publisher": "DigitalDefiance",
+  "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.105.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "File Management"
   ],
   "keywords": [
     "filesystem",
@@ -17,26 +19,712 @@
     "mcp-server",
     "ai-agent",
     "copilot",
-    "file-management"
+    "file-management",
+    "batch-operations",
+    "directory-watching",
+    "file-search",
+    "security"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "mcp-acs-filesystem.mcp-provider",
+        "label": "MCP Filesystem Manager"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "mcp-acs-filesystem.participant",
+        "name": "filesystem",
+        "description": "MCP Filesystem Manager - Advanced file operations with security boundaries",
+        "isSticky": true
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "fs_batch_operations",
+        "displayName": "Batch File Operations",
+        "modelDescription": "Execute multiple filesystem operations atomically",
+        "toolReferenceName": "batchOperations",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "operations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "copy",
+                      "move",
+                      "delete"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "destination": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "atomic": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "operations"
+          ]
+        }
+      },
+      {
+        "name": "fs_watch_directory",
+        "displayName": "Watch Directory",
+        "modelDescription": "Watch directory for filesystem changes",
+        "toolReferenceName": "watchDirectory",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "recursive": {
+              "type": "boolean"
+            },
+            "filters": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "path"
+          ]
+        }
+      },
+      {
+        "name": "fs_get_watch_events",
+        "displayName": "Get Watch Events",
+        "modelDescription": "Get accumulated events from a watch session",
+        "toolReferenceName": "getWatchEvents",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sessionId"
+          ]
+        }
+      },
+      {
+        "name": "fs_stop_watch",
+        "displayName": "Stop Watch",
+        "modelDescription": "Stop a directory watch session",
+        "toolReferenceName": "stopWatch",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sessionId"
+          ]
+        }
+      },
+      {
+        "name": "fs_search_files",
+        "displayName": "Search Files",
+        "modelDescription": "Search for files by name, content, or metadata",
+        "toolReferenceName": "searchFiles",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "searchType": {
+              "type": "string",
+              "enum": [
+                "name",
+                "content",
+                "both"
+              ]
+            },
+            "fileTypes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "minSize": {
+              "type": "number"
+            },
+            "maxSize": {
+              "type": "number"
+            },
+            "modifiedAfter": {
+              "type": "string"
+            },
+            "useIndex": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "fs_build_index",
+        "displayName": "Build Index",
+        "modelDescription": "Build file index for fast searching",
+        "toolReferenceName": "buildIndex",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "includeContent": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "path"
+          ]
+        }
+      },
+      {
+        "name": "fs_create_symlink",
+        "displayName": "Create Symlink",
+        "modelDescription": "Create a symbolic link",
+        "toolReferenceName": "createSymlink",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "linkPath": {
+              "type": "string"
+            },
+            "targetPath": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "linkPath",
+            "targetPath"
+          ]
+        }
+      },
+      {
+        "name": "fs_compute_checksum",
+        "displayName": "Compute Checksum",
+        "modelDescription": "Compute file checksums",
+        "toolReferenceName": "computeChecksum",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "algorithm": {
+              "type": "string",
+              "enum": [
+                "md5",
+                "sha1",
+                "sha256",
+                "sha512"
+              ]
+            }
+          },
+          "required": [
+            "path"
+          ]
+        }
+      },
+      {
+        "name": "fs_verify_checksum",
+        "displayName": "Verify Checksum",
+        "modelDescription": "Verify file checksum",
+        "toolReferenceName": "verifyChecksum",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "checksum": {
+              "type": "string"
+            },
+            "algorithm": {
+              "type": "string",
+              "enum": [
+                "md5",
+                "sha1",
+                "sha256",
+                "sha512"
+              ]
+            }
+          },
+          "required": [
+            "path",
+            "checksum"
+          ]
+        }
+      },
+      {
+        "name": "fs_analyze_disk_usage",
+        "displayName": "Analyze Disk Usage",
+        "modelDescription": "Analyze disk usage and directory sizes",
+        "toolReferenceName": "analyzeDiskUsage",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "depth": {
+              "type": "number"
+            },
+            "groupByType": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "path"
+          ]
+        }
+      },
+      {
+        "name": "fs_copy_directory",
+        "displayName": "Copy Directory",
+        "modelDescription": "Copy directory recursively",
+        "toolReferenceName": "copyDirectory",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "destination": {
+              "type": "string"
+            },
+            "preserveMetadata": {
+              "type": "boolean"
+            },
+            "exclusions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "source",
+            "destination"
+          ]
+        }
+      },
+      {
+        "name": "fs_sync_directory",
+        "displayName": "Sync Directory",
+        "modelDescription": "Sync directories (copy only newer or missing files)",
+        "toolReferenceName": "syncDirectory",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "filesystem",
+          "mcp"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "destination": {
+              "type": "string"
+            },
+            "exclusions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "source",
+            "destination"
+          ]
+        }
+      }
+    ],
     "commands": [
       {
         "command": "mcp-filesystem.configureMcp",
-        "title": "MCP Filesystem: Add to Copilot MCP Servers"
+        "title": "MCP Filesystem: Add to Copilot MCP Servers",
+        "icon": "$(add)"
+      },
+      {
+        "command": "mcp-filesystem.batchOperations",
+        "title": "MCP Filesystem: Batch Operations",
+        "icon": "$(files)"
+      },
+      {
+        "command": "mcp-filesystem.watchDirectory",
+        "title": "MCP Filesystem: Watch Directory",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "mcp-filesystem.searchFiles",
+        "title": "MCP Filesystem: Search Files",
+        "icon": "$(search)"
+      },
+      {
+        "command": "mcp-filesystem.computeChecksum",
+        "title": "MCP Filesystem: Compute Checksum",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "mcp-filesystem.analyzeDiskUsage",
+        "title": "MCP Filesystem: Analyze Disk Usage",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "mcp-filesystem.showSecurityBoundaries",
+        "title": "MCP Filesystem: Show Security Boundaries",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "mcp-filesystem.refreshOperations",
+        "title": "MCP Filesystem: Refresh Operations",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mcp-filesystem.openSettings",
+        "title": "MCP Filesystem: Open Settings",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "mcp-filesystem.restartServer",
+        "title": "MCP Filesystem: Restart Server",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "mcp-filesystem.stopWatchSession",
+        "title": "MCP Filesystem: Stop Watch Session",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "mcp-filesystem.viewOperationDetails",
+        "title": "MCP Filesystem: View Operation Details",
+        "icon": "$(info)"
+      },
+      {
+        "command": "mcp-filesystem.clearOperationHistory",
+        "title": "MCP Filesystem: Clear Operation History",
+        "icon": "$(clear-all)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mcp-filesystem-explorer",
+          "title": "MCP Filesystem Manager",
+          "icon": "$(files)"
+        }
+      ]
+    },
+    "views": {
+      "mcp-filesystem-explorer": [
+        {
+          "id": "mcp-filesystem-operations",
+          "name": "File Operations",
+          "icon": "$(files)",
+          "contextualTitle": "MCP File Operations"
+        },
+        {
+          "id": "mcp-filesystem-security",
+          "name": "Security Boundaries",
+          "icon": "$(lock)",
+          "contextualTitle": "Security Configuration"
+        }
+      ]
+    },
+    "walkthroughs": [
+      {
+        "id": "mcp-acs-filesystem.walkthrough",
+        "title": "Get Started with MCP Filesystem Manager",
+        "description": "Learn how to perform advanced file operations with AI assistance",
+        "steps": [
+          {
+            "id": "install",
+            "title": "Extension Installed",
+            "description": "MCP Filesystem Manager is now active.\n[Open Settings](command:workbench.action.openSettings?%5B%22mcp-filesystem%22%5D)",
+            "media": {
+              "markdown": "README.md"
+            }
+          },
+          {
+            "id": "copilot",
+            "title": "Use with Copilot",
+            "description": "Ask Copilot to manage files:\n- `@filesystem batch copy files`\n- `@filesystem search for *.ts files`\n[Try it now](command:workbench.action.chat.open)",
+            "media": {
+              "markdown": "README.md"
+            }
+          }
+        ]
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "mcp-filesystem.searchFiles",
+        "key": "ctrl+shift+f ctrl+shift+s",
+        "mac": "cmd+shift+f cmd+shift+s"
+      },
+      {
+        "command": "mcp-filesystem.batchOperations",
+        "key": "ctrl+shift+f ctrl+shift+b",
+        "mac": "cmd+shift+f cmd+shift+b"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "mcp-filesystem.refreshOperations",
+          "when": "view == mcp-filesystem-operations",
+          "group": "navigation"
+        },
+        {
+          "command": "mcp-filesystem.clearOperationHistory",
+          "when": "view == mcp-filesystem-operations",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "mcp-filesystem.stopWatchSession",
+          "when": "view == mcp-filesystem-operations && viewItem == watchSession",
+          "group": "inline"
+        },
+        {
+          "command": "mcp-filesystem.viewOperationDetails",
+          "when": "view == mcp-filesystem-operations && viewItem == operation",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "mcp-filesystem.configureMcp"
+        },
+        {
+          "command": "mcp-filesystem.batchOperations"
+        },
+        {
+          "command": "mcp-filesystem.watchDirectory"
+        },
+        {
+          "command": "mcp-filesystem.searchFiles"
+        },
+        {
+          "command": "mcp-filesystem.computeChecksum"
+        },
+        {
+          "command": "mcp-filesystem.analyzeDiskUsage"
+        },
+        {
+          "command": "mcp-filesystem.showSecurityBoundaries"
+        },
+        {
+          "command": "mcp-filesystem.refreshOperations"
+        },
+        {
+          "command": "mcp-filesystem.openSettings"
+        },
+        {
+          "command": "mcp-filesystem.restartServer"
+        },
+        {
+          "command": "mcp-filesystem.stopWatchSession",
+          "when": "false"
+        },
+        {
+          "command": "mcp-filesystem.viewOperationDetails",
+          "when": "false"
+        },
+        {
+          "command": "mcp-filesystem.clearOperationHistory"
+        }
+      ]
+    },
     "configuration": {
       "title": "MCP Filesystem Manager",
       "properties": {
-        "mcp-filesystem.autoStart": {
+        "mcp-filesystem.server.serverPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to MCP filesystem server executable.\n\nLeave empty to use the bundled server or global installation.\n\n**Note:** Changes require server restart."
+        },
+        "mcp-filesystem.server.autoStart": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically start MCP server when VS Code opens"
+          "markdownDescription": "Automatically start MCP server when VS Code opens."
+        },
+        "mcp-filesystem.server.logLevel": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "default": "info",
+          "markdownDescription": "Log level for MCP filesystem manager."
+        },
+        "mcp-filesystem.security.workspaceRoot": {
+          "type": "string",
+          "default": "${workspaceFolder}",
+          "markdownDescription": "Workspace root directory - all operations confined to this directory.\n\n**Security:** This is the primary security boundary."
+        },
+        "mcp-filesystem.security.allowedSubdirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Allowed subdirectories within workspace.\n\n**Security:** If specified, only these subdirectories are accessible."
+        },
+        "mcp-filesystem.security.blockedPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".git",
+            ".env",
+            "node_modules",
+            ".ssh"
+          ],
+          "markdownDescription": "Blocked paths within workspace.\n\n**Security:** These paths are always blocked."
+        },
+        "mcp-filesystem.security.blockedPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "*.key",
+            "*.pem",
+            "*.env",
+            "*secret*",
+            "*password*"
+          ],
+          "markdownDescription": "Blocked file patterns.\n\n**Security:** Files matching these patterns are blocked."
+        },
+        "mcp-filesystem.resources.maxFileSize": {
+          "type": "number",
+          "default": 104857600,
+          "markdownDescription": "Maximum file size for operations (bytes).\n\n**Default:** 104857600 bytes (100 MB)"
+        },
+        "mcp-filesystem.resources.maxBatchSize": {
+          "type": "number",
+          "default": 1073741824,
+          "markdownDescription": "Maximum total size for batch operations (bytes).\n\n**Default:** 1073741824 bytes (1 GB)"
+        },
+        "mcp-filesystem.resources.maxOperationsPerMinute": {
+          "type": "number",
+          "default": 100,
+          "markdownDescription": "Maximum operations per minute.\n\n**Rate Limiting:** Prevents abuse."
+        },
+        "mcp-filesystem.audit.enableAuditLog": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable audit logging.\n\n**Security:** Logs all filesystem operations."
+        },
+        "mcp-filesystem.ui.showSecurityWarnings": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show security warnings in UI."
+        },
+        "mcp-filesystem.ui.confirmDangerousOperations": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Require confirmation for dangerous operations."
+        },
+        "mcp-filesystem.ui.refreshInterval": {
+          "type": "number",
+          "default": 5000,
+          "markdownDescription": "Auto-refresh interval for operations view (milliseconds). Set to 0 to disable."
         }
       }
     }
@@ -45,19 +733,33 @@
     "vscode:prepublish": "npm run compile",
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js",
     "lint": "eslint src --ext ts",
+    "vsce:login": "vsce login DigitalDefiance",
     "package": "vsce package --no-dependencies",
     "publish": "vsce publish --no-dependencies"
   },
   "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
     "@types/node": "^20.x",
     "@types/vscode": "^1.96.0",
+    "@vscode/test-electron": "^2.3.8",
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.27.1",
+    "fast-check": "^3.15.0",
+    "glob": "^10.3.10",
+    "mocha": "^10.2.0",
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@ai-capabilities-suite/vscode-shared-status-bar": "^1.0.14"
+    "@ai-capabilities-suite/mcp-filesystem": "^0.1.0",
+    "@ai-capabilities-suite/vscode-shared-status-bar": "^1.0.21",
+    "@modelcontextprotocol/sdk": "^1.23.0",
+    "vscode-languageclient": "^10.0.0-next.15",
+    "vscode-languageserver": "^10.0.0-next.15",
+    "vscode-languageserver-textdocument": "^1.0.12"
   },
   "repository": {
     "type": "git",

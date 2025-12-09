@@ -5,12 +5,12 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
-"@ai-capabilities-suite/vscode-shared-status-bar@npm:^1.0.14":
-  version: 1.0.14
-  resolution: "@ai-capabilities-suite/vscode-shared-status-bar@npm:1.0.14"
+"@ai-capabilities-suite/vscode-shared-status-bar@npm:^1.0.21":
+  version: 1.0.21
+  resolution: "@ai-capabilities-suite/vscode-shared-status-bar@npm:1.0.21"
   peerDependencies:
     vscode: ^1.80.0
-  checksum: 10c0/74b76d9b145324dfa4891b9d2079be15cd3d9cd81b19192666f63e0b36d0d6b4279b72e5c83e4fda7b08b088c60d38d2f7d1519c28277494b7bdf7b968d9aeca
+  checksum: 10c0/857134e9b10f11c7eee62b36a0555aff341ebf6d45d0b32dcf81bc28f30c5ff8560cbba96e80f7e7ee0f5a5fb4b1d6a6d02237fd37988dc5a8286c41a52dc9a0
   languageName: node
   linkType: hard
 
@@ -2281,7 +2281,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "mcp-acs-filesystem@workspace:."
   dependencies:
-    "@ai-capabilities-suite/vscode-shared-status-bar": "npm:^1.0.14"
+    "@ai-capabilities-suite/vscode-shared-status-bar": "npm:^1.0.21"
     "@types/node": "npm:^20.x"
     "@types/vscode": "npm:^1.96.0"
     "@vscode/vsce": "npm:^3.7.1"
