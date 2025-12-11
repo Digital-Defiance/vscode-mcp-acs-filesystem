@@ -24,7 +24,11 @@ async function main() {
 
   // Build test files
   const testCtx = await esbuild.context({
-    entryPoints: ["src/test/runTest.ts", "src/test/suite/*.test.ts"],
+    entryPoints: [
+      "src/test/runTest.ts",
+      "src/test/suite/index.ts",
+      "src/test/suite/*.test.ts",
+    ],
     bundle: true,
     format: "cjs",
     minify: false,
@@ -32,7 +36,7 @@ async function main() {
     sourcesContent: false,
     platform: "node",
     outdir: "out/test",
-    external: ["vscode", "mocha"],
+    external: ["vscode", "mocha", "glob"],
     logLevel: "silent",
   });
 

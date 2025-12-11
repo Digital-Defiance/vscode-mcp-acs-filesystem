@@ -9,8 +9,10 @@ import {
 import { OperationsTreeDataProvider } from "./operationsTreeProvider";
 import { SecurityTreeDataProvider } from "./securityTreeProvider";
 import { MCPFilesystemClient } from "./mcpClient";
+import { FilesystemLanguageServer } from "./languageServerClient";
 
 let mcpClient: MCPFilesystemClient | undefined;
+let languageServer: FilesystemLanguageServer | undefined;
 let outputChannel: vscode.LogOutputChannel;
 let statusBarItem: vscode.StatusBarItem | undefined;
 let operationsTreeProvider: OperationsTreeDataProvider;
@@ -76,7 +78,7 @@ async function configureMcpServer(): Promise<void> {
   mcpConfig.servers = mcpConfig.servers || {};
   mcpConfig.servers[serverName] = {
     type: "stdio",
-    command: "npx",
+    command: process.platform === "win32" ? "npx.cmd" : "npx",
     args: ["-y", "@ai-capabilities-suite/mcp-filesystem"],
   };
 
@@ -318,7 +320,12 @@ async function restartServer(): Promise<void> {
   try {
     outputChannel.appendLine("Restarting MCP Filesystem server...");
 
-    // Stop existing server
+    // Stop existing servers
+    if (languageServer) {
+      await languageServer.stop();
+      languageServer = undefined;
+    }
+
     if (mcpClient) {
       mcpClient.stop();
       mcpClient = undefined;
@@ -327,9 +334,16 @@ async function restartServer(): Promise<void> {
     // Wait a moment for cleanup
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Start new server
+    // Start new servers
     mcpClient = new MCPFilesystemClient(outputChannel);
     await mcpClient.start();
+
+    // Restart language server
+    const context = (global as any).__extensionContext;
+    if (context) {
+      languageServer = new FilesystemLanguageServer(context, outputChannel);
+      await languageServer.start();
+    }
 
     // Update providers
     operationsTreeProvider.setMCPClient(mcpClient);
@@ -507,6 +521,9 @@ function getOperationDetailsHTML(operation: any): string {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
+  // Store context globally for restart function
+  (global as any).__extensionContext = context;
+
   outputChannel = vscode.window.createOutputChannel("MCP Filesystem Manager", {
     log: true,
   });
@@ -971,6 +988,18 @@ export async function activate(context: vscode.ExtensionContext) {
         "MCP Filesystem server could not be started. Some features may be unavailable."
       );
     }
+
+    // Initialize Language Server for Copilot integration
+    try {
+      languageServer = new FilesystemLanguageServer(context, outputChannel);
+      await languageServer.start();
+      outputChannel.appendLine(
+        "Filesystem Language Server started successfully"
+      );
+    } catch (error) {
+      outputChannel.appendLine(`Failed to start Language Server: ${error}`);
+      // Don't show error to user - LSP is optional for core functionality
+    }
   }
 
   // Initialize tree providers
@@ -1161,6 +1190,21 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export async function deactivate() {
+  // Stop language server
+  if (languageServer) {
+    await languageServer.stop();
+  }
+
+  // Stop MCP client
+  if (mcpClient) {
+    mcpClient.stop();
+  }
+
+  // Clear refresh interval
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+
   await unregisterExtension("mcp-acs-filesystem");
   outputChannel?.dispose();
   statusBarItem?.dispose();

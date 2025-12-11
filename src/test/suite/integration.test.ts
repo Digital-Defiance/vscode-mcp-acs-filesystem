@@ -32,14 +32,14 @@ suite("Integration Test Suite", () => {
     assert.ok(typeof autoStart === "boolean");
   });
 
-  test("Security tree provider should show configuration", async () => {
-    // Execute the show security boundaries command
-    await vscode.commands.executeCommand(
-      "mcp-filesystem.showSecurityBoundaries"
+  test("Security tree provider should be accessible", async () => {
+    // Verify the security boundaries command is registered
+    // (we can't execute it in tests because it shows a dialog)
+    const commands = await vscode.commands.getCommands(true);
+    assert.ok(
+      commands.includes("mcp-filesystem.showSecurityBoundaries"),
+      "showSecurityBoundaries command should be registered"
     );
-
-    // If we get here without error, the command worked
-    assert.ok(true);
   });
 
   test("Operations tree provider should be accessible", async () => {
