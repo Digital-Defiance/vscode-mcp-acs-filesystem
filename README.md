@@ -40,6 +40,7 @@ Advanced filesystem operations for AI agents with MCP integration and strict sec
 
 1. Install from VS Code Marketplace
 2. Or install via command line:
+
    ```bash
    code --install-extension DigitalDefiance.mcp-acs-filesystem
    ```
@@ -304,7 +305,7 @@ Quick fixes for common issues:
 
 ### Server Not Starting
 
-1. Check output panel: `View > Output > MCP Filesystem Manager`
+1. Check output panel: `View > Output > MCP ACS Filesystem Manager`
 2. Verify Node.js is installed: `node --version`
 3. Check server path in settings
 4. Try restarting VS Code
@@ -358,7 +359,7 @@ Each error includes recovery suggestions to help you resolve the issue quickly.
 
 - **Issues**: [GitHub Issues](https://github.com/digital-defiance/ai-capabilities-suite/issues)
 - **Documentation**: [GitHub Repository](https://github.com/digital-defiance/ai-capabilities-suite)
-- **Email**: info@digitaldefiance.org
+- **Email**: <info@digitaldefiance.org>
 
 ## License
 
@@ -368,9 +369,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 This extension is part of the Digital Defiance AI Capabilities Suite, which includes:
 
-- **MCP Process Manager**: Process management with security boundaries
-- **MCP Screenshot**: Cross-platform screenshot capture
-- **MCP Debugger**: Advanced debugging capabilities
-- **MCP Filesystem Manager**: Advanced file operations (this extension)
+- **MCP ACS Process Manager**: Process management with security boundaries
+- **MCP ACS Screenshot**: Cross-platform screenshot capture
+- **MCP ACS Debugger**: Advanced debugging capabilities
+- **MCP ACS Filesystem Manager**: Advanced file operations (this extension)
 
 Visit [Digital Defiance](https://digitaldefiance.org) for more information.

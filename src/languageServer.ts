@@ -246,7 +246,7 @@ connection.onHover(async (params: any): Promise<Hover | null> => {
             "",
             `Path: \`${path}\``,
             "",
-            "**MCP Filesystem Manager** provides secure file operations:",
+            "**MCP ACS Filesystem Manager** provides secure file operations:",
             "- All operations confined to workspace root",
             "- Blocked paths and patterns enforced",
             "- Audit logging enabled",

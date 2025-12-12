@@ -3,7 +3,7 @@
   "homepage": "https://github.com/Digital-Defiance/vscode-mcp-acs-filesystem",
   "displayName": "MCP ACS Filesystem Manager",
   "description": "Production-ready filesystem operations for AI agents with MCP integration, LSP support, comprehensive security boundaries, and extensive test suite. Part of the Digital Defiance AI Capabilities Suite.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "packageManager": "yarn@4.12.0",
   "publisher": "DigitalDefiance",
   "icon": "images/icon.png",
@@ -50,7 +50,7 @@
       {
         "id": "mcp-acs-filesystem.participant",
         "name": "filesystem",
-        "description": "MCP Filesystem Manager - Advanced file operations with security boundaries",
+        "description": "MCP ACS Filesystem Manager - Advanced file operations with security boundaries",
         "isSticky": true
       }
     ],
@@ -551,7 +551,7 @@
       "activitybar": [
         {
           "id": "mcp-filesystem-explorer",
-          "title": "MCP Filesystem Manager",
+          "title": "MCP ACS Filesystem Manager",
           "icon": "$(files)"
         }
       ]
@@ -575,13 +575,13 @@
     "walkthroughs": [
       {
         "id": "mcp-acs-filesystem.walkthrough",
-        "title": "Get Started with MCP Filesystem Manager",
+        "title": "Get Started with MCP ACS Filesystem Manager",
         "description": "Learn how to perform advanced file operations with AI assistance",
         "steps": [
           {
             "id": "install",
             "title": "Extension Installed",
-            "description": "MCP Filesystem Manager is now active.\n[Open Settings](command:workbench.action.openSettings?%5B%22mcp-filesystem%22%5D)",
+            "description": "MCP ACS Filesystem Manager is now active.\n[Open Settings](command:workbench.action.openSettings?%5B%22mcp-filesystem%22%5D)",
             "media": {
               "markdown": "README.md"
             }
@@ -706,7 +706,7 @@
       ]
     },
     "configuration": {
-      "title": "MCP Filesystem Manager",
+      "title": "MCP ACS Filesystem Manager",
       "properties": {
         "mcp-filesystem.server.serverPath": {
           "type": "string",
@@ -732,7 +732,7 @@
             "error"
           ],
           "default": "info",
-          "markdownDescription": "Log level for MCP filesystem manager."
+          "markdownDescription": "Log level for MCP ACS Filesystem Manager."
         },
         "mcp-filesystem.security.workspaceRoot": {
           "type": "string",
@@ -865,7 +865,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@ai-capabilities-suite/mcp-filesystem": "^0.1.6",
+    "@ai-capabilities-suite/mcp-filesystem": "^0.1.7",
     "@ai-capabilities-suite/vscode-shared-status-bar": "^1.0.21",
     "@modelcontextprotocol/sdk": "^1.23.0",
     "vscode-languageclient": "^10.0.0-next.15",

@@ -5,9 +5,9 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
-"@ai-capabilities-suite/mcp-filesystem@npm:^0.1.5":
-  version: 0.1.5
-  resolution: "@ai-capabilities-suite/mcp-filesystem@npm:0.1.5"
+"@ai-capabilities-suite/mcp-filesystem@npm:^0.1.7":
+  version: 0.1.7
+  resolution: "@ai-capabilities-suite/mcp-filesystem@npm:0.1.7"
   dependencies:
     "@modelcontextprotocol/sdk": "npm:^1.23.0"
     chokidar: "npm:^4.0.3"
@@ -18,7 +18,7 @@ __metadata:
     zod: "npm:^4.1.13"
   bin:
     mcp-filesystem: dist/cli.js
-  checksum: 10c0/d45e01e2cbf6477404fa1ad7a97f8309121ea78e682033e840c039741cf567abffc46fae2ca7905282a35ecfdec6000f961b5b51a33341a19d4a698cf5d95e59
+  checksum: 10c0/4123bd0b81b4a4d5bd15de42729f35d7cc6ea20cdb2348faa7c554083e5d514d33cbed4d3658cd0e89ed5a4f16f3f896ed933078b036c2c950fba08c0c8be69d
   languageName: node
   linkType: hard
 
@@ -3155,7 +3155,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "mcp-acs-filesystem@workspace:."
   dependencies:
-    "@ai-capabilities-suite/mcp-filesystem": "npm:^0.1.5"
+    "@ai-capabilities-suite/mcp-filesystem": "npm:^0.1.7"
     "@ai-capabilities-suite/vscode-shared-status-bar": "npm:^1.0.21"
     "@modelcontextprotocol/sdk": "npm:^1.23.0"
     "@types/glob": "npm:^8.1.0"

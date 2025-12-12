@@ -94,7 +94,7 @@ async function configureMcpServer(): Promise<void> {
   await vscode.window.showTextDocument(doc);
 
   vscode.window.showInformationMessage(
-    `MCP Filesystem Manager server added to ${mcpJsonPath}. Restart the MCP server to use it with Copilot.`
+    `MCP ACS Filesystem Manager server added to ${mcpJsonPath}. Restart the MCP server to use it with Copilot.`
   );
 }
 
@@ -554,10 +554,15 @@ export async function activate(context: vscode.ExtensionContext) {
   // Store context globally for restart function
   (global as any).__extensionContext = context;
 
-  outputChannel = vscode.window.createOutputChannel("MCP Filesystem Manager", {
-    log: true,
-  });
-  outputChannel.appendLine("MCP Filesystem Manager extension activating...");
+  outputChannel = vscode.window.createOutputChannel(
+    "MCP ACS Filesystem Manager",
+    {
+      log: true,
+    }
+  );
+  outputChannel.appendLine(
+    "MCP ACS Filesystem Manager extension activating..."
+  );
 
   // Initialize Error Handler first
   errorHandler = new ErrorHandler(outputChannel);
@@ -609,7 +614,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
         return [
           new vscode.McpStdioServerDefinition(
-            "MCP Filesystem Manager",
+            "MCP ACS Filesystem Manager",
             command,
             args
           ),
@@ -1340,7 +1345,7 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  outputChannel.appendLine("MCP Filesystem Manager extension activated");
+  outputChannel.appendLine("MCP ACS Filesystem Manager extension activated");
 
   // Register with shared status bar
   await registerExtension("mcp-acs-filesystem", {
