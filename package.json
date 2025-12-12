@@ -3,7 +3,7 @@
   "homepage": "https://github.com/Digital-Defiance/vscode-mcp-acs-filesystem",
   "displayName": "MCP ACS Filesystem Manager",
   "description": "Production-ready filesystem operations for AI agents with MCP integration, LSP support, comprehensive security boundaries, and extensive test suite. Part of the Digital Defiance AI Capabilities Suite.",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "packageManager": "yarn@4.12.0",
   "publisher": "DigitalDefiance",
   "icon": "images/icon.png",
@@ -40,12 +40,6 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "mcpServerDefinitionProviders": [
-      {
-        "id": "mcp-acs-filesystem.mcp-provider",
-        "label": "MCP ACS Filesystem Manager"
-      }
-    ],
     "chatParticipants": [
       {
         "id": "mcp-acs-filesystem.participant",
@@ -437,11 +431,6 @@
     ],
     "commands": [
       {
-        "command": "mcp-filesystem.configureMcp",
-        "title": "MCP Filesystem: Add to Copilot MCP Servers",
-        "icon": "$(add)"
-      },
-      {
         "command": "mcp-filesystem.batchOperations",
         "title": "MCP Filesystem: Batch Operations",
         "icon": "$(files)"
@@ -635,9 +624,6 @@
         }
       ],
       "commandPalette": [
-        {
-          "command": "mcp-filesystem.configureMcp"
-        },
         {
           "command": "mcp-filesystem.batchOperations"
         },
@@ -865,7 +851,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@ai-capabilities-suite/mcp-filesystem": "^0.1.7",
+    "@ai-capabilities-suite/mcp-filesystem": "^0.1.8",
     "@ai-capabilities-suite/vscode-shared-status-bar": "^1.0.21",
     "@modelcontextprotocol/sdk": "^1.23.0",
     "vscode-languageclient": "^10.0.0-next.15",
