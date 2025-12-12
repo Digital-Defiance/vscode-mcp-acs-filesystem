@@ -22,6 +22,24 @@ async function main() {
     ],
   });
 
+  // Build language server
+  const lsCtx = await esbuild.context({
+    entryPoints: ["src/languageServer.ts"],
+    bundle: true,
+    format: "cjs",
+    minify: production,
+    sourcemap: !production,
+    sourcesContent: false,
+    platform: "node",
+    outfile: "out/languageServer.js",
+    external: ["vscode"],
+    logLevel: "silent",
+    plugins: [
+      /* add to the end of plugins array */
+      esbuildProblemMatcherPlugin,
+    ],
+  });
+
   // Build test files
   const testCtx = await esbuild.context({
     entryPoints: [
@@ -42,11 +60,14 @@ async function main() {
 
   if (watch) {
     await ctx.watch();
+    await lsCtx.watch();
     await testCtx.watch();
   } else {
     await ctx.rebuild();
+    await lsCtx.rebuild();
     await testCtx.rebuild();
     await ctx.dispose();
+    await lsCtx.dispose();
     await testCtx.dispose();
   }
 }
