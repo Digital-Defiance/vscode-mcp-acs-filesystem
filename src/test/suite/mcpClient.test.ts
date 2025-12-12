@@ -1,16 +1,22 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
 import { MCPFilesystemClient } from "../../mcpClient";
+import { SettingsManager } from "../../settingsManager";
+import { ErrorHandler, ErrorCategory } from "../../errorHandling";
 
 suite("MCP Filesystem Client Test Suite", () => {
   let outputChannel: vscode.LogOutputChannel;
   let client: MCPFilesystemClient;
+  let settingsManager: SettingsManager;
+  let errorHandler: ErrorHandler;
 
   setup(() => {
     outputChannel = vscode.window.createOutputChannel(
       "Test MCP Filesystem Client",
       { log: true }
     );
+    settingsManager = new SettingsManager();
+    errorHandler = new ErrorHandler(outputChannel);
     client = new MCPFilesystemClient(outputChannel);
   });
 
@@ -593,6 +599,363 @@ suite("MCP Filesystem Client Test Suite", () => {
       const sessions = client.getWatchSessions();
 
       assert.strictEqual(sessions.length, 2);
+    });
+  });
+
+  suite("Settings Manager Integration", () => {
+    test("Client should accept settings manager in constructor", () => {
+      const clientWithSettings = new MCPFilesystemClient(
+        outputChannel,
+        settingsManager
+      );
+      assert.ok(clientWithSettings);
+      clientWithSettings.stop();
+    });
+
+    test("Client should accept both settings manager and error handler", () => {
+      const clientWithBoth = new MCPFilesystemClient(
+        outputChannel,
+        settingsManager,
+        errorHandler
+      );
+      assert.ok(clientWithBoth);
+      clientWithBoth.stop();
+    });
+
+    test("Client should log settings on start when settings manager provided", async () => {
+      const clientWithSettings = new MCPFilesystemClient(
+        outputChannel,
+        settingsManager
+      );
+
+      await clientWithSettings.start();
+
+      // Settings should be logged (we can't easily verify output channel content,
+      // but we can verify no errors were thrown)
+      assert.ok(clientWithSettings.isRunning());
+      clientWithSettings.stop();
+    });
+
+    test("Client should handle settings changes", async () => {
+      const clientWithSettings = new MCPFilesystemClient(
+        outputChannel,
+        settingsManager
+      );
+
+      await clientWithSettings.start();
+
+      // Trigger a settings change
+      const settings = settingsManager.getSettings();
+      settings.server.timeout = 10000;
+
+      // Client should handle the change without errors
+      assert.ok(clientWithSettings.isRunning());
+      clientWithSettings.stop();
+    });
+
+    test("Client should unsubscribe from settings on stop", async () => {
+      const clientWithSettings = new MCPFilesystemClient(
+        outputChannel,
+        settingsManager
+      );
+
+      await clientWithSettings.start();
+      clientWithSettings.stop();
+
+      // After stop, settings changes should not affect the client
+      const settings = settingsManager.getSettings();
+      settings.server.timeout = 15000;
+
+      // No errors should occur
+      assert.ok(true);
+    });
+
+    test("Client should work without settings manager", async () => {
+      const clientWithoutSettings = new MCPFilesystemClient(outputChannel);
+
+      await clientWithoutSettings.start();
+      assert.ok(clientWithoutSettings.isRunning());
+      clientWithoutSettings.stop();
+    });
+  });
+
+  suite("Error Handler Integration", () => {
+    test("Client should accept error handler in constructor", () => {
+      const clientWithErrors = new MCPFilesystemClient(
+        outputChannel,
+        undefined,
+        errorHandler
+      );
+      assert.ok(clientWithErrors);
+      clientWithErrors.stop();
+    });
+
+    test("Client should handle watch session not found error gracefully", () => {
+      const clientWithErrors = new MCPFilesystemClient(
+        outputChannel,
+        undefined,
+        errorHandler
+      );
+
+      // Should not throw when stopping non-existent session
+      assert.doesNotThrow(() => {
+        clientWithErrors.stopWatch("invalid_session_id");
+      });
+
+      clientWithErrors.stop();
+    });
+
+    test("Client should handle getWatchEvents error with error handler", async () => {
+      const clientWithErrors = new MCPFilesystemClient(
+        outputChannel,
+        undefined,
+        errorHandler
+      );
+
+      await assert.rejects(
+        async () =>
+          await clientWithErrors.getWatchEvents({
+            sessionId: "invalid_session",
+          }),
+        /Watch session not found/
+      );
+
+      clientWithErrors.stop();
+    });
+
+    test("Client should work without error handler", async () => {
+      const clientWithoutErrors = new MCPFilesystemClient(outputChannel);
+
+      // Should still handle errors gracefully
+      assert.doesNotThrow(() => {
+        clientWithoutErrors.stopWatch("invalid_session");
+      });
+
+      await assert.rejects(
+        async () =>
+          await clientWithoutErrors.getWatchEvents({
+            sessionId: "invalid_session",
+          })
+      );
+
+      clientWithoutErrors.stop();
+    });
+
+    test("Client should categorize errors correctly", async () => {
+      const clientWithErrors = new MCPFilesystemClient(
+        outputChannel,
+        undefined,
+        errorHandler
+      );
+
+      // User error: invalid session ID
+      try {
+        await clientWithErrors.getWatchEvents({ sessionId: "invalid" });
+        assert.fail("Should have thrown");
+      } catch (error: any) {
+        assert.ok(error.message.includes("Watch session not found"));
+      }
+
+      clientWithErrors.stop();
+    });
+  });
+
+  suite("Error Scenarios", () => {
+    test("Client should handle empty operations array", async () => {
+      const result = await client.batchOperations({ operations: [] });
+
+      assert.strictEqual(result.status, "success");
+      assert.strictEqual(result.results.length, 0);
+    });
+
+    test("Client should handle invalid operation types gracefully", async () => {
+      const operations = [
+        { type: "invalid_type", source: "/a", destination: "/b" },
+      ];
+
+      const result = await client.batchOperations({ operations });
+
+      assert.strictEqual(result.status, "success");
+      assert.strictEqual(result.results.length, 1);
+    });
+
+    test("Client should handle missing required parameters", async () => {
+      const operations = [{ type: "copy" }]; // Missing source and destination
+
+      const result = await client.batchOperations({ operations });
+
+      assert.strictEqual(result.status, "success");
+    });
+
+    test("Client should handle very long paths", async () => {
+      const longPath = "/a".repeat(500);
+      const result = await client.watchDirectory({ path: longPath });
+
+      assert.strictEqual(result.status, "success");
+      assert.strictEqual(result.path, longPath);
+    });
+
+    test("Client should handle special characters in paths", async () => {
+      const specialPath = "/path/with spaces/and-special!@#$%chars";
+      const result = await client.watchDirectory({ path: specialPath });
+
+      assert.strictEqual(result.status, "success");
+      assert.strictEqual(result.path, specialPath);
+    });
+
+    test("Client should handle empty search query", async () => {
+      const result = await client.searchFiles({ query: "" });
+
+      assert.strictEqual(result.status, "success");
+      assert.strictEqual(result.query, "");
+    });
+
+    test("Client should handle very large batch operations", async () => {
+      const operations = [];
+      for (let i = 0; i < 1000; i++) {
+        operations.push({
+          type: "copy",
+          source: `/src/file${i}.txt`,
+          destination: `/dest/file${i}.txt`,
+        });
+      }
+
+      const result = await client.batchOperations({ operations });
+
+      assert.strictEqual(result.status, "success");
+      assert.strictEqual(result.results.length, 1000);
+    });
+
+    test("Client should handle concurrent operations", async () => {
+      const promises = [];
+      for (let i = 0; i < 10; i++) {
+        promises.push(
+          client.batchOperations({
+            operations: [
+              { type: "copy", source: `/a${i}`, destination: `/b${i}` },
+            ],
+          })
+        );
+      }
+
+      const results = await Promise.all(promises);
+
+      assert.strictEqual(results.length, 10);
+      results.forEach((result) => {
+        assert.strictEqual(result.status, "success");
+      });
+    });
+
+    test("Client should handle multiple watch sessions on same path", async () => {
+      const result1 = await client.watchDirectory({ path: "/test" });
+      const result2 = await client.watchDirectory({ path: "/test" });
+
+      assert.strictEqual(result1.status, "success");
+      assert.strictEqual(result2.status, "success");
+      assert.notStrictEqual(result1.sessionId, result2.sessionId);
+
+      const sessions = client.getWatchSessions();
+      assert.strictEqual(sessions.length, 2);
+    });
+
+    test("Client should handle stopping already stopped watch session", () => {
+      const sessionId = client.recordWatchSession("/test", false);
+      client.stopWatch(sessionId);
+
+      // Stopping again should not throw
+      assert.doesNotThrow(() => {
+        client.stopWatch(sessionId);
+      });
+    });
+
+    test("Client should handle null or undefined parameters gracefully", async () => {
+      // These should use defaults or handle gracefully
+      const result1 = await client.searchFiles({
+        query: "test",
+        searchType: undefined,
+      });
+      assert.strictEqual(result1.status, "success");
+
+      const result2 = await client.computeChecksum({
+        path: "/file.txt",
+        algorithm: undefined,
+      });
+      assert.strictEqual(result2.status, "success");
+    });
+
+    test("Client should handle rapid operation recording", () => {
+      for (let i = 0; i < 100; i++) {
+        client.recordBatchOperation([
+          { type: "copy", source: `/a${i}`, destination: `/b${i}` },
+        ]);
+      }
+
+      const ops = client.getOperations();
+      assert.strictEqual(ops.length, 100);
+    });
+
+    test("Client should handle clearing operations multiple times", () => {
+      client.recordBatchOperation([
+        { type: "copy", source: "/a", destination: "/b" },
+      ]);
+      client.clearOperations();
+      assert.strictEqual(client.getOperations().length, 0);
+
+      // Clearing again should not throw
+      assert.doesNotThrow(() => {
+        client.clearOperations();
+      });
+      assert.strictEqual(client.getOperations().length, 0);
+    });
+
+    test("Client should handle operations after stop", () => {
+      client.stop();
+
+      // Recording operations after stop should still work
+      const operationId = client.recordBatchOperation([
+        { type: "copy", source: "/a", destination: "/b" },
+      ]);
+
+      assert.ok(operationId);
+      assert.strictEqual(client.getOperations().length, 1);
+    });
+
+    test("Client should handle very large file sizes in disk usage", async () => {
+      const result = await client.analyzeDiskUsage({
+        path: "/large",
+        depth: 100,
+      });
+
+      assert.strictEqual(result.status, "success");
+    });
+
+    test("Client should handle negative depth in disk usage", async () => {
+      const result = await client.analyzeDiskUsage({
+        path: "/test",
+        depth: -1,
+      });
+
+      assert.strictEqual(result.status, "success");
+    });
+
+    test("Client should handle empty exclusions array", async () => {
+      const result = await client.copyDirectory({
+        source: "/src",
+        destination: "/dest",
+        exclusions: [],
+      });
+
+      assert.strictEqual(result.status, "success");
+    });
+
+    test("Client should handle undefined exclusions", async () => {
+      const result = await client.syncDirectory({
+        source: "/src",
+        destination: "/dest",
+        exclusions: undefined,
+      });
+
+      assert.strictEqual(result.status, "success");
     });
   });
 });

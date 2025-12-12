@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { SettingsManager } from "./settingsManager";
+import { ErrorHandler, ErrorCategory } from "./errorHandling";
 
 export interface FileOperation {
   id: string;
@@ -27,23 +29,80 @@ export class MCPFilesystemClient {
   private operations: Map<string, FileOperation> = new Map();
   private watchSessions: Map<string, WatchSession> = new Map();
   private outputChannel: vscode.LogOutputChannel;
+  private settingsManager?: SettingsManager;
+  private errorHandler?: ErrorHandler;
+  private settingsSubscription?: vscode.Disposable;
 
-  constructor(outputChannel: vscode.LogOutputChannel) {
+  constructor(
+    outputChannel: vscode.LogOutputChannel,
+    settingsManager?: SettingsManager,
+    errorHandler?: ErrorHandler
+  ) {
     this.outputChannel = outputChannel;
+    this.settingsManager = settingsManager;
+    this.errorHandler = errorHandler;
+
+    // Subscribe to settings changes
+    if (this.settingsManager) {
+      this.settingsSubscription = this.settingsManager.onDidChange(
+        (settings) => {
+          this.onSettingsChanged(settings);
+        }
+      );
+    }
   }
 
   async start(): Promise<void> {
     this.outputChannel.appendLine("MCP Filesystem client initialized");
+
+    // Log current settings
+    if (this.settingsManager) {
+      const settings = this.settingsManager.getSettings();
+      this.outputChannel.appendLine(
+        `Server timeout: ${settings.server.timeout}ms`
+      );
+      this.outputChannel.appendLine(
+        `Max file size: ${settings.security.maxFileSize} bytes`
+      );
+      this.outputChannel.appendLine(
+        `Max batch size: ${settings.security.maxBatchSize} bytes`
+      );
+    }
   }
 
   stop(): void {
     this.operations.clear();
     this.watchSessions.clear();
+
+    // Unsubscribe from settings changes
+    if (this.settingsSubscription) {
+      this.settingsSubscription.dispose();
+      this.settingsSubscription = undefined;
+    }
+
     this.outputChannel.appendLine("MCP Filesystem client stopped");
   }
 
   isRunning(): boolean {
     return true;
+  }
+
+  /**
+   * Handle settings changes
+   */
+  private onSettingsChanged(settings: any): void {
+    this.outputChannel.appendLine("MCP client settings updated");
+
+    // Log relevant setting changes
+    this.outputChannel.appendLine(
+      `Server timeout: ${settings.server.timeout}ms`
+    );
+    this.outputChannel.appendLine(
+      `Max operations per minute: ${settings.security.maxOperationsPerMinute}`
+    );
+
+    // Note: In a real implementation, we might need to reconnect to the server
+    // or update rate limiters based on new settings
   }
 
   /**
@@ -89,7 +148,40 @@ export class MCPFilesystemClient {
    * Stop watching a directory
    */
   stopWatch(sessionId: string): void {
-    this.watchSessions.delete(sessionId);
+    try {
+      const session = this.watchSessions.get(sessionId);
+      if (!session) {
+        // Log warning but don't throw - handle gracefully
+        this.outputChannel.appendLine(
+          `Warning: Watch session not found: ${sessionId}`
+        );
+        if (this.errorHandler) {
+          this.errorHandler.handleError({
+            name: "WatchSessionNotFoundError",
+            message: `Watch session not found: ${sessionId}`,
+            category: ErrorCategory.USER_ERROR,
+            context: { sessionId },
+          });
+        }
+        return;
+      }
+      this.watchSessions.delete(sessionId);
+      this.outputChannel.appendLine(`Watch session stopped: ${sessionId}`);
+    } catch (error: any) {
+      // Log error but don't throw - handle gracefully
+      this.outputChannel.appendLine(
+        `Error stopping watch session: ${error.message || error}`
+      );
+      if (this.errorHandler) {
+        this.errorHandler.handleError({
+          name: "StopWatchError",
+          message: error.message || "Failed to stop watch session",
+          category: ErrorCategory.SYSTEM_ERROR,
+          context: { sessionId },
+          originalError: error,
+        });
+      }
+    }
   }
 
   /**
@@ -234,16 +326,38 @@ export class MCPFilesystemClient {
    * Get watch events (stub - actual implementation via MCP server)
    */
   async getWatchEvents(params: { sessionId: string }): Promise<any> {
-    const session = this.watchSessions.get(params.sessionId);
-    if (!session) {
-      throw new Error(`Watch session not found: ${params.sessionId}`);
+    try {
+      const session = this.watchSessions.get(params.sessionId);
+      if (!session) {
+        const error = new Error(`Watch session not found: ${params.sessionId}`);
+        if (this.errorHandler) {
+          this.errorHandler.handleError({
+            name: "WatchSessionNotFoundError",
+            message: error.message,
+            category: ErrorCategory.USER_ERROR,
+            context: { sessionId: params.sessionId },
+          });
+        }
+        throw error;
+      }
+      return {
+        status: "success",
+        sessionId: params.sessionId,
+        events: [],
+        eventCount: session.eventCount,
+      };
+    } catch (error: any) {
+      if (this.errorHandler && !error.category) {
+        this.errorHandler.handleError({
+          name: "GetWatchEventsError",
+          message: error.message || "Failed to get watch events",
+          category: ErrorCategory.SYSTEM_ERROR,
+          context: { sessionId: params.sessionId },
+          originalError: error,
+        });
+      }
+      throw error;
     }
-    return {
-      status: "success",
-      sessionId: params.sessionId,
-      events: [],
-      eventCount: session.eventCount,
-    };
   }
 
   /**

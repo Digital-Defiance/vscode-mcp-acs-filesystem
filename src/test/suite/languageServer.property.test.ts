@@ -698,13 +698,23 @@ suite("Language Server Property-Based Tests", () => {
               case "outsideWorkspace":
               case "blockedPath":
               case "blockedPattern":
-                testDocContent = `const path = "${invalidOperation.path}";\n`;
+                testDocContent = `const path = "${
+                  "path" in invalidOperation ? invalidOperation.path : ""
+                }";\n`;
                 break;
               case "syncOperation":
-                testDocContent = `${invalidOperation.operation}("test.txt");\n`;
+                testDocContent = `${
+                  "operation" in invalidOperation
+                    ? invalidOperation.operation
+                    : ""
+                }("test.txt");\n`;
                 break;
               case "symlinkOperation":
-                testDocContent = `${invalidOperation.operation}("link", "target");\n`;
+                testDocContent = `${
+                  "operation" in invalidOperation
+                    ? invalidOperation.operation
+                    : ""
+                }("link", "target");\n`;
                 break;
             }
 
@@ -743,6 +753,7 @@ suite("Language Server Property-Based Tests", () => {
                 );
                 if (
                   !hasWorkspaceWarning &&
+                  "path" in invalidOperation &&
                   invalidOperation.path.startsWith("/")
                 ) {
                   // Only assert if it's clearly an absolute path
@@ -762,10 +773,11 @@ suite("Language Server Property-Based Tests", () => {
                 );
                 // Only assert if the path contains obvious blocked directories
                 if (
-                  invalidOperation.path.includes(".git") ||
-                  invalidOperation.path.includes(".env") ||
-                  invalidOperation.path.includes("node_modules") ||
-                  invalidOperation.path.includes(".ssh")
+                  "path" in invalidOperation &&
+                  (invalidOperation.path.includes(".git") ||
+                    invalidOperation.path.includes(".env") ||
+                    invalidOperation.path.includes("node_modules") ||
+                    invalidOperation.path.includes(".ssh"))
                 ) {
                   assert.ok(
                     hasBlockedPathError,
@@ -783,10 +795,11 @@ suite("Language Server Property-Based Tests", () => {
                 );
                 // Only assert if the path matches obvious blocked patterns
                 if (
-                  invalidOperation.path.endsWith(".key") ||
-                  invalidOperation.path.endsWith(".pem") ||
-                  invalidOperation.path.includes("secret") ||
-                  invalidOperation.path.includes("password")
+                  "path" in invalidOperation &&
+                  (invalidOperation.path.endsWith(".key") ||
+                    invalidOperation.path.endsWith(".pem") ||
+                    invalidOperation.path.includes("secret") ||
+                    invalidOperation.path.includes("password"))
                 ) {
                   assert.ok(
                     hasBlockedPatternError,
@@ -802,10 +815,12 @@ suite("Language Server Property-Based Tests", () => {
                     d.message.toLowerCase().includes("async") ||
                     d.message.toLowerCase().includes("sync")
                 );
-                assert.ok(
-                  hasSyncWarning,
-                  `Expected diagnostic for sync operation: ${invalidOperation.operation}`
-                );
+                if ("operation" in invalidOperation) {
+                  assert.ok(
+                    hasSyncWarning,
+                    `Expected diagnostic for sync operation: ${invalidOperation.operation}`
+                  );
+                }
                 break;
 
               case "symlinkOperation":
@@ -815,10 +830,12 @@ suite("Language Server Property-Based Tests", () => {
                     d.message.toLowerCase().includes("symlink") ||
                     d.message.toLowerCase().includes("validated")
                 );
-                assert.ok(
-                  hasSymlinkInfo,
-                  `Expected diagnostic for symlink operation: ${invalidOperation.operation}`
-                );
+                if ("operation" in invalidOperation) {
+                  assert.ok(
+                    hasSymlinkInfo,
+                    `Expected diagnostic for symlink operation: ${invalidOperation.operation}`
+                  );
+                }
                 break;
             }
 
@@ -1152,9 +1169,11 @@ suite("Language Server Property-Based Tests", () => {
             // If we added a blocked path/pattern that matches our test path,
             // we should see diagnostics appear or change
             if (configChange.type === "blockedPaths") {
-              const pathMatchesBlocked = configChange.value.some((blocked) =>
-                testPath.includes(blocked)
-              );
+              const pathMatchesBlocked =
+                Array.isArray(configChange.value) &&
+                configChange.value.some((blocked: string) =>
+                  testPath.includes(blocked)
+                );
               if (pathMatchesBlocked) {
                 // We expect diagnostics to appear or increase
                 const diagnosticsChanged =
@@ -1171,10 +1190,12 @@ suite("Language Server Property-Based Tests", () => {
             }
 
             if (configChange.type === "blockedPatterns") {
-              const pathMatchesPattern = configChange.value.some((pattern) => {
-                const regex = new RegExp(pattern.replace(/\*/g, ".*"));
-                return regex.test(testPath);
-              });
+              const pathMatchesPattern =
+                Array.isArray(configChange.value) &&
+                configChange.value.some((pattern: string) => {
+                  const regex = new RegExp(pattern.replace(/\*/g, ".*"));
+                  return regex.test(testPath);
+                });
               if (pathMatchesPattern) {
                 // We expect diagnostics to appear or increase
                 const diagnosticsChanged =

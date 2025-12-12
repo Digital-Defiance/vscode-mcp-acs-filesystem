@@ -1,0 +1,30 @@
+{
+  "all": true,
+  "src": "out",
+  "include": [
+    "out/errorHandling.js",
+    "out/extension.js",
+    "out/languageServerClient.js",
+    "out/mcpClient.js",
+    "out/operationsTreeProvider.js",
+    "out/platformDetection.js",
+    "out/securityTreeProvider.js",
+    "out/settingsManager.js"
+  ],
+  "exclude": [
+    "out/test/**",
+    "**/*.test.js",
+    "**/*.spec.js",
+    "**/node_modules/**"
+  ],
+  "exclude-after-remap": true,
+  "reporter": ["text", "html", "lcov", "json-summary"],
+  "report-dir": "coverage",
+  "check-coverage": true,
+  "lines": 70,
+  "statements": 70,
+  "functions": 60,
+  "branches": 60,
+  "skip-full": false,
+  "clean": true
+}

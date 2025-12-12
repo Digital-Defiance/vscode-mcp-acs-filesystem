@@ -10,9 +10,13 @@ import { OperationsTreeDataProvider } from "./operationsTreeProvider";
 import { SecurityTreeDataProvider } from "./securityTreeProvider";
 import { MCPFilesystemClient } from "./mcpClient";
 import { FilesystemLanguageServer } from "./languageServerClient";
+import { SettingsManager } from "./settingsManager";
+import { ErrorHandler } from "./errorHandling";
 
 let mcpClient: MCPFilesystemClient | undefined;
 let languageServer: FilesystemLanguageServer | undefined;
+let settingsManager: SettingsManager | undefined;
+let errorHandler: ErrorHandler | undefined;
 let outputChannel: vscode.LogOutputChannel;
 let statusBarItem: vscode.StatusBarItem | undefined;
 let operationsTreeProvider: OperationsTreeDataProvider;
@@ -98,17 +102,23 @@ async function configureMcpServer(): Promise<void> {
  * Show security boundaries dialog
  */
 async function showSecurityBoundaries(): Promise<void> {
-  const config = vscode.workspace.getConfiguration("mcp-filesystem");
-  const workspaceRoot = config.get<string>(
-    "security.workspaceRoot",
-    "${workspaceFolder}"
-  );
-  const allowedSubdirs = config.get<string[]>(
-    "security.allowedSubdirectories",
-    []
-  );
-  const blockedPaths = config.get<string[]>("security.blockedPaths", []);
-  const blockedPatterns = config.get<string[]>("security.blockedPatterns", []);
+  const settings = settingsManager
+    ? settingsManager.getSettings()
+    : {
+        security: {
+          workspaceRoot: "${workspaceFolder}",
+          allowedSubdirectories: [],
+          blockedPaths: [],
+          blockedPatterns: [],
+        },
+      };
+
+  const {
+    workspaceRoot,
+    allowedSubdirectories,
+    blockedPaths,
+    blockedPatterns,
+  } = settings.security;
 
   const message = `
 **Security Boundaries**
@@ -117,8 +127,8 @@ async function showSecurityBoundaries(): Promise<void> {
 All operations are confined to this directory.
 
 **Allowed Subdirectories:** ${
-    allowedSubdirs.length > 0
-      ? allowedSubdirs.join(", ")
+    allowedSubdirectories.length > 0
+      ? allowedSubdirectories.join(", ")
       : "All (within workspace)"
   }
 
@@ -276,8 +286,9 @@ function startAutoRefresh(): void {
     clearInterval(refreshInterval);
   }
 
-  const config = vscode.workspace.getConfiguration("mcp-filesystem");
-  const interval = config.get<number>("ui.refreshInterval", 5000);
+  const interval = settingsManager
+    ? settingsManager.getSettings().ui.refreshInterval
+    : 5000;
 
   if (interval > 0) {
     refreshInterval = setInterval(() => {
@@ -335,7 +346,11 @@ async function restartServer(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Start new servers
-    mcpClient = new MCPFilesystemClient(outputChannel);
+    mcpClient = new MCPFilesystemClient(
+      outputChannel,
+      settingsManager,
+      errorHandler
+    );
     await mcpClient.start();
 
     // Restart language server
@@ -357,9 +372,19 @@ async function restartServer(): Promise<void> {
     operationsTreeProvider.refresh();
   } catch (error: any) {
     outputChannel.appendLine(`Failed to restart MCP server: ${error}`);
-    vscode.window.showErrorMessage(
-      `Failed to restart MCP Filesystem server: ${error.message || error}`
-    );
+    if (errorHandler) {
+      errorHandler.handleError({
+        name: "ServerRestartError",
+        message: error.message || "Failed to restart MCP server",
+        category: errorHandler.categorizeError(error),
+        context: { operation: "restart" },
+        originalError: error,
+      });
+    } else {
+      vscode.window.showErrorMessage(
+        `Failed to restart MCP Filesystem server: ${error.message || error}`
+      );
+    }
   }
 }
 
@@ -520,6 +545,11 @@ function getOperationDetailsHTML(operation: any): string {
   `;
 }
 
+/**
+ * Activate the extension
+ * Initializes all components and registers commands
+ * @param context - The VS Code extension context
+ */
 export async function activate(context: vscode.ExtensionContext) {
   // Store context globally for restart function
   (global as any).__extensionContext = context;
@@ -528,6 +558,30 @@ export async function activate(context: vscode.ExtensionContext) {
     log: true,
   });
   outputChannel.appendLine("MCP Filesystem Manager extension activating...");
+
+  // Initialize Error Handler first
+  errorHandler = new ErrorHandler(outputChannel);
+  context.subscriptions.push(errorHandler);
+  outputChannel.appendLine("Error Handler initialized");
+
+  // Initialize Settings Manager
+  settingsManager = new SettingsManager();
+  context.subscriptions.push(settingsManager);
+  outputChannel.appendLine("Settings Manager initialized");
+
+  // Validate settings on startup
+  const settings = settingsManager.getSettings();
+  const validation = settingsManager.validateSettings(settings);
+  if (!validation.valid) {
+    const errorMsg = `Invalid configuration: ${validation.errors.join(", ")}`;
+    outputChannel.appendLine(errorMsg);
+    vscode.window.showErrorMessage(`MCP Filesystem: ${errorMsg}`);
+  }
+  if (validation.warnings.length > 0) {
+    outputChannel.appendLine(
+      `Configuration warnings: ${validation.warnings.join(", ")}`
+    );
+  }
 
   // Check if we're running in test mode
   const isTestMode =
@@ -974,37 +1028,67 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // Initialize MCP client
-  const config = vscode.workspace.getConfiguration("mcp-filesystem");
-  const autoStart = config.get<boolean>("server.autoStart", true);
+  const autoStart = settingsManager.getSettings().server.autoStart;
 
   if (autoStart && !isTestMode) {
     try {
-      mcpClient = new MCPFilesystemClient(outputChannel);
+      mcpClient = new MCPFilesystemClient(
+        outputChannel,
+        settingsManager,
+        errorHandler
+      );
       await mcpClient.start();
       outputChannel.appendLine("MCP Filesystem client started successfully");
-    } catch (error) {
+    } catch (error: any) {
       outputChannel.appendLine(`Failed to start MCP client: ${error}`);
-      vscode.window.showWarningMessage(
-        "MCP Filesystem server could not be started. Some features may be unavailable."
-      );
+      if (errorHandler) {
+        errorHandler.handleError({
+          name: "MCPClientStartError",
+          message: error.message || "Failed to start MCP client",
+          category: errorHandler.categorizeError(error),
+          context: { component: "MCPClient" },
+          originalError: error,
+        });
+      } else {
+        vscode.window.showWarningMessage(
+          "MCP Filesystem server could not be started. Some features may be unavailable."
+        );
+      }
     }
 
-    // Initialize Language Server for Copilot integration
+    // Initialize Language Server for Copilot integration (after MCP client)
     try {
       languageServer = new FilesystemLanguageServer(context, outputChannel);
       await languageServer.start();
       outputChannel.appendLine(
         "Filesystem Language Server started successfully"
       );
-    } catch (error) {
+    } catch (error: any) {
       outputChannel.appendLine(`Failed to start Language Server: ${error}`);
+      if (errorHandler) {
+        errorHandler.handleError({
+          name: "LanguageServerStartError",
+          message: error.message || "Failed to start Language Server",
+          category: errorHandler.categorizeError(error),
+          context: { component: "LanguageServer" },
+          originalError: error,
+        });
+      }
       // Don't show error to user - LSP is optional for core functionality
     }
   }
 
   // Initialize tree providers
-  operationsTreeProvider = new OperationsTreeDataProvider();
-  securityTreeProvider = new SecurityTreeDataProvider();
+  operationsTreeProvider = new OperationsTreeDataProvider(
+    settingsManager,
+    errorHandler
+  );
+  securityTreeProvider = new SecurityTreeDataProvider(
+    settingsManager,
+    errorHandler
+  );
+  context.subscriptions.push(operationsTreeProvider);
+  context.subscriptions.push(securityTreeProvider);
 
   // Set MCP client in providers
   if (mcpClient) {
@@ -1028,10 +1112,16 @@ export async function activate(context: vscode.ExtensionContext) {
   // Start auto-refresh for operations view
   startAutoRefresh();
 
-  // Listen for configuration changes to refresh security view
+  // Listen for configuration changes to refresh security view and reload settings
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("mcp-filesystem")) {
+        // Reload settings through Settings Manager
+        if (settingsManager) {
+          settingsManager.reloadSettings();
+          outputChannel.appendLine("Settings reloaded from configuration");
+        }
+
         securityTreeProvider.refresh();
 
         // Restart server if needed
@@ -1159,6 +1249,97 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
+  // Register additional commands for MCP operations
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "mcp-filesystem.getWatchEvents",
+      async () => {
+        vscode.window.showInformationMessage(
+          "Get watch events - Use Copilot with @filesystem to retrieve watch events"
+        );
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("mcp-filesystem.stopWatch", async () => {
+      vscode.window.showInformationMessage(
+        "Stop watch - Use Copilot with @filesystem to stop watching"
+      );
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("mcp-filesystem.buildIndex", async () => {
+      vscode.window.showInformationMessage(
+        "Build index - Use Copilot with @filesystem to build file index"
+      );
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "mcp-filesystem.verifyChecksum",
+      async () => {
+        vscode.window.showInformationMessage(
+          "Verify checksum - Use Copilot with @filesystem to verify checksums"
+        );
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "mcp-filesystem.copyDirectory",
+      async () => {
+        vscode.window.showInformationMessage(
+          "Copy directory - Use Copilot with @filesystem to copy directories"
+        );
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "mcp-filesystem.syncDirectory",
+      async () => {
+        vscode.window.showInformationMessage(
+          "Sync directory - Use Copilot with @filesystem to sync directories"
+        );
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "mcp-filesystem.createSymlink",
+      async () => {
+        vscode.window.showInformationMessage(
+          "Create symlink - Use Copilot with @filesystem to create symbolic links"
+        );
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "mcp-filesystem.clearOperations",
+      async () => {
+        await clearOperationHistory();
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "mcp-filesystem.refreshSecurity",
+      async () => {
+        securityTreeProvider.refresh();
+        vscode.window.showInformationMessage("Security view refreshed");
+      }
+    )
+  );
+
   outputChannel.appendLine("MCP Filesystem Manager extension activated");
 
   // Register with shared status bar
@@ -1187,22 +1368,50 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push({
     dispose: () => unregisterExtension("mcp-acs-filesystem"),
   });
+
+  // Return extension API for testing and external use
+  return {
+    mcpClient,
+    languageServer,
+    settingsManager,
+    errorHandler,
+    outputChannel,
+  };
 }
 
+/**
+ * Deactivate the extension
+ * Cleans up all resources and stops all services
+ */
 export async function deactivate() {
   // Stop language server
   if (languageServer) {
     await languageServer.stop();
+    languageServer = undefined;
   }
 
   // Stop MCP client
   if (mcpClient) {
     mcpClient.stop();
+    mcpClient = undefined;
+  }
+
+  // Dispose Settings Manager
+  if (settingsManager) {
+    settingsManager.dispose();
+    settingsManager = undefined;
+  }
+
+  // Dispose Error Handler
+  if (errorHandler) {
+    errorHandler.dispose();
+    errorHandler = undefined;
   }
 
   // Clear refresh interval
   if (refreshInterval) {
     clearInterval(refreshInterval);
+    refreshInterval = undefined;
   }
 
   await unregisterExtension("mcp-acs-filesystem");

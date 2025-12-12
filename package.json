@@ -2,7 +2,7 @@
   "name": "mcp-acs-filesystem",
   "homepage": "https://github.com/Digital-Defiance/vscode-mcp-acs-filesystem",
   "displayName": "MCP ACS Filesystem Manager",
-  "description": "Advanced filesystem operations for AI agents with MCP integration and security boundaries. Part of the Digital Defiance AI Capabilities Suite.",
+  "description": "Production-ready filesystem operations for AI agents with MCP integration, LSP support, comprehensive security boundaries, and extensive test suite. Part of the Digital Defiance AI Capabilities Suite.",
   "version": "0.1.4",
   "packageManager": "yarn@4.12.0",
   "publisher": "DigitalDefiance",
@@ -23,7 +23,13 @@
     "batch-operations",
     "directory-watching",
     "file-search",
-    "security"
+    "security",
+    "lsp",
+    "language-server",
+    "property-based-testing",
+    "security-boundaries",
+    "error-handling",
+    "settings-management"
   ],
   "activationEvents": [
     "onStartupFinished",
@@ -494,6 +500,51 @@
         "command": "mcp-filesystem.clearOperationHistory",
         "title": "MCP Filesystem: Clear Operation History",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "mcp-filesystem.getWatchEvents",
+        "title": "MCP Filesystem: Get Watch Events",
+        "icon": "$(list-unordered)"
+      },
+      {
+        "command": "mcp-filesystem.stopWatch",
+        "title": "MCP Filesystem: Stop Watch",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "mcp-filesystem.buildIndex",
+        "title": "MCP Filesystem: Build Index",
+        "icon": "$(database)"
+      },
+      {
+        "command": "mcp-filesystem.verifyChecksum",
+        "title": "MCP Filesystem: Verify Checksum",
+        "icon": "$(verified)"
+      },
+      {
+        "command": "mcp-filesystem.copyDirectory",
+        "title": "MCP Filesystem: Copy Directory",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "mcp-filesystem.syncDirectory",
+        "title": "MCP Filesystem: Sync Directory",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mcp-filesystem.createSymlink",
+        "title": "MCP Filesystem: Create Symlink",
+        "icon": "$(link)"
+      },
+      {
+        "command": "mcp-filesystem.clearOperations",
+        "title": "MCP Filesystem: Clear Operations",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "mcp-filesystem.refreshSecurity",
+        "title": "MCP Filesystem: Refresh Security",
+        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -624,6 +675,33 @@
         },
         {
           "command": "mcp-filesystem.clearOperationHistory"
+        },
+        {
+          "command": "mcp-filesystem.getWatchEvents"
+        },
+        {
+          "command": "mcp-filesystem.stopWatch"
+        },
+        {
+          "command": "mcp-filesystem.buildIndex"
+        },
+        {
+          "command": "mcp-filesystem.verifyChecksum"
+        },
+        {
+          "command": "mcp-filesystem.copyDirectory"
+        },
+        {
+          "command": "mcp-filesystem.syncDirectory"
+        },
+        {
+          "command": "mcp-filesystem.createSymlink"
+        },
+        {
+          "command": "mcp-filesystem.clearOperations"
+        },
+        {
+          "command": "mcp-filesystem.refreshSecurity"
         }
       ]
     },
@@ -639,6 +717,11 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Automatically start MCP server when VS Code opens."
+        },
+        "mcp-filesystem.server.timeout": {
+          "type": "number",
+          "default": 30000,
+          "markdownDescription": "Server timeout in milliseconds.\n\n**Default:** 30000 ms (30 seconds)"
         },
         "mcp-filesystem.server.logLevel": {
           "type": "string",
@@ -711,6 +794,11 @@
           "default": true,
           "markdownDescription": "Enable audit logging.\n\n**Security:** Logs all filesystem operations."
         },
+        "mcp-filesystem.ui.showNotifications": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show notifications for operations."
+        },
         "mcp-filesystem.ui.showSecurityWarnings": {
           "type": "boolean",
           "default": true,
@@ -725,6 +813,26 @@
           "type": "number",
           "default": 5000,
           "markdownDescription": "Auto-refresh interval for operations view (milliseconds). Set to 0 to disable."
+        },
+        "mcp-filesystem.operations.enableBatch": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable batch operations."
+        },
+        "mcp-filesystem.operations.enableWatch": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable directory watching."
+        },
+        "mcp-filesystem.operations.enableSearch": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable file search."
+        },
+        "mcp-filesystem.operations.enableChecksum": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable checksum operations."
         }
       }
     }
@@ -734,7 +842,9 @@
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "pretest": "npm run compile",
-    "test": "node ./out/test/runTest.js",
+    "test": "XDG_RUNTIME_DIR=$HOME/.local/run DBUS_SESSION_BUS_ADDRESS=unix:path=$HOME/.local/run/bus node ./out/test/runTest.js",
+    "test:coverage": "c8 npm test",
+    "coverage:report": "c8 report",
     "lint": "eslint src --ext ts",
     "vsce:login": "vsce login DigitalDefiance",
     "package": "vsce package --no-dependencies",
@@ -747,6 +857,7 @@
     "@types/vscode": "^1.96.0",
     "@vscode/test-electron": "^2.3.8",
     "@vscode/vsce": "^3.7.1",
+    "c8": "^10.1.3",
     "esbuild": "^0.27.1",
     "fast-check": "^3.15.0",
     "glob": "^10.3.10",

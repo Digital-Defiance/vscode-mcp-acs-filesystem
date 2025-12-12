@@ -312,6 +312,13 @@ export class SettingsManager {
   }
 
   /**
+   * Reload settings from configuration (alias for reloadSettings)
+   */
+  public reload(): void {
+    this.reloadSettings();
+  }
+
+  /**
    * Dispose resources
    */
   public dispose(): void {
