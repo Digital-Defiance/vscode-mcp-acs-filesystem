@@ -1229,6 +1229,12 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand("mcp-filesystem.configureMcp", async () => {
+      await openSettings();
+    })
+  );
+
   outputChannel.appendLine("MCP ACS Filesystem Manager extension activated");
 
   // Register with shared status bar

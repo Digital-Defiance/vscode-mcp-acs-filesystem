@@ -1,4 +1,9 @@
 import * as vscode from "vscode";
+import * as path from "path";
+import {
+  BaseMCPClient,
+  LogOutputChannel,
+} from "@ai-capabilities-suite/mcp-client-base";
 import { SettingsManager } from "./settingsManager";
 import { ErrorHandler, ErrorCategory } from "./errorHandling";
 
@@ -21,24 +26,34 @@ export interface WatchSession {
   startTime: Date;
 }
 
+export interface SecurityConfig {
+  workspaceRoot: string;
+  allowedSubdirectories: string[];
+  blockedPaths: string[];
+  blockedPatterns: string[];
+  maxFileSize: number;
+  maxBatchSize: number;
+  maxOperationsPerMinute: number;
+}
+
 /**
- * Simplified filesystem client that tracks operations locally
- * The actual MCP server communication happens through VS Code's language model tools
+ * Filesystem client that extends BaseMCPClient for consistent timeout handling
+ * and connection management across all MCP ACS extensions
  */
-export class MCPFilesystemClient {
+export class MCPFilesystemClient extends BaseMCPClient {
   private operations: Map<string, FileOperation> = new Map();
   private watchSessions: Map<string, WatchSession> = new Map();
-  private outputChannel: vscode.LogOutputChannel;
   private settingsManager?: SettingsManager;
   private errorHandler?: ErrorHandler;
   private settingsSubscription?: vscode.Disposable;
+  private serverConfig?: SecurityConfig;
 
   constructor(
-    outputChannel: vscode.LogOutputChannel,
+    outputChannel: LogOutputChannel,
     settingsManager?: SettingsManager,
     errorHandler?: ErrorHandler
   ) {
-    this.outputChannel = outputChannel;
+    super("Filesystem", outputChannel);
     this.settingsManager = settingsManager;
     this.errorHandler = errorHandler;
 
@@ -52,25 +67,118 @@ export class MCPFilesystemClient {
     }
   }
 
-  async start(): Promise<void> {
-    this.outputChannel.appendLine("MCP Filesystem client initialized");
+  /**
+   * Set the server configuration to be passed via IPC
+   * @param config The SecurityConfig to pass to the server
+   */
+  public setServerConfig(config: SecurityConfig): void {
+    this.serverConfig = config;
+  }
+
+  async connect(): Promise<void> {
+    return this.start();
+  }
+
+  async disconnect(): Promise<void> {
+    this.stop();
+  }
+
+  // ========== Abstract Method Implementations ==========
+
+  protected getServerCommand(): { command: string; args: string[] } {
+    const config = vscode.workspace.getConfiguration("mcp-filesystem");
+    const serverPath = config.get<string>("server.serverPath");
+
+    let serverCommand: string;
+    let args: string[] = [];
+
+    if (process.env.VSCODE_TEST_MODE === "true") {
+      try {
+        // In test mode, use the local build
+        let extensionPath = "";
+        const extension = vscode.extensions.getExtension(
+          "DigitalDefiance.mcp-acs-filesystem"
+        );
+        if (extension) {
+          extensionPath = extension.extensionPath;
+        }
+
+        if (extensionPath) {
+          serverCommand = "node";
+          const serverScript = path.resolve(
+            extensionPath,
+            "../mcp-filesystem/dist/cli.js"
+          );
+          args = [serverScript];
+        } else {
+          serverCommand =
+            serverPath && serverPath.length > 0 ? serverPath : "mcp-filesystem";
+        }
+      } catch (error) {
+        serverCommand =
+          serverPath && serverPath.length > 0 ? serverPath : "mcp-filesystem";
+      }
+    } else {
+      if (serverPath && serverPath.length > 0) {
+        serverCommand = serverPath;
+      } else {
+        // Use npx to run the server
+        serverCommand = process.platform === "win32" ? "npx.cmd" : "npx";
+        args = ["-y", "@ai-capabilities-suite/mcp-filesystem"];
+      }
+    }
+
+    return { command: serverCommand, args };
+  }
+
+  protected getServerEnv(): Record<string, string> {
+    const env: Record<string, string> = {};
+
+    // Copy process.env, filtering out undefined values
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value !== undefined) {
+        env[key] = value;
+      }
+    }
+
+    // Pass configuration via environment variable
+    if (this.serverConfig) {
+      env["MCP_FILESYSTEM_CONFIG"] = JSON.stringify(this.serverConfig);
+      this.log(
+        "info",
+        "Passing configuration via MCP_FILESYSTEM_CONFIG environment variable"
+      );
+    }
+
+    return env;
+  }
+
+  protected async onServerReady(): Promise<void> {
+    // Send initialized notification
+    await this.sendNotification("initialized", {});
+
+    // Load configuration - list available tools
+    try {
+      const tools = await this.sendRequest("tools/list", {});
+      this.log("info", `Server tools loaded: ${JSON.stringify(tools)}`);
+    } catch (error) {
+      this.log("warn", `Failed to list tools: ${error}`);
+    }
 
     // Log current settings
     if (this.settingsManager) {
       const settings = this.settingsManager.getSettings();
-      this.outputChannel.appendLine(
-        `Server timeout: ${settings.server.timeout}ms`
-      );
-      this.outputChannel.appendLine(
-        `Max file size: ${settings.security.maxFileSize} bytes`
-      );
-      this.outputChannel.appendLine(
+      this.log("info", `Server timeout: ${settings.server.timeout}ms`);
+      this.log("info", `Max file size: ${settings.security.maxFileSize} bytes`);
+      this.log(
+        "info",
         `Max batch size: ${settings.security.maxBatchSize} bytes`
       );
     }
   }
 
-  stop(): void {
+  // Override stop to add cleanup
+  override stop(): void {
     this.operations.clear();
     this.watchSessions.clear();
 
@@ -80,24 +188,24 @@ export class MCPFilesystemClient {
       this.settingsSubscription = undefined;
     }
 
-    this.outputChannel.appendLine("MCP Filesystem client stopped");
+    // Call parent stop
+    super.stop();
   }
 
   isRunning(): boolean {
-    return true;
+    return this.isServerProcessAlive();
   }
 
   /**
    * Handle settings changes
    */
   private onSettingsChanged(settings: any): void {
-    this.outputChannel.appendLine("MCP client settings updated");
+    this.log("info", "MCP client settings updated");
 
     // Log relevant setting changes
-    this.outputChannel.appendLine(
-      `Server timeout: ${settings.server.timeout}ms`
-    );
-    this.outputChannel.appendLine(
+    this.log("info", `Server timeout: ${settings.server.timeout}ms`);
+    this.log(
+      "info",
       `Max operations per minute: ${settings.security.maxOperationsPerMinute}`
     );
 
@@ -152,9 +260,7 @@ export class MCPFilesystemClient {
       const session = this.watchSessions.get(sessionId);
       if (!session) {
         // Log warning but don't throw - handle gracefully
-        this.outputChannel.appendLine(
-          `Warning: Watch session not found: ${sessionId}`
-        );
+        this.log("warn", `Watch session not found: ${sessionId}`);
         if (this.errorHandler) {
           this.errorHandler.handleError({
             name: "WatchSessionNotFoundError",
@@ -166,10 +272,11 @@ export class MCPFilesystemClient {
         return;
       }
       this.watchSessions.delete(sessionId);
-      this.outputChannel.appendLine(`Watch session stopped: ${sessionId}`);
+      this.log("info", `Watch session stopped: ${sessionId}`);
     } catch (error: any) {
       // Log error but don't throw - handle gracefully
-      this.outputChannel.appendLine(
+      this.log(
+        "error",
         `Error stopping watch session: ${error.message || error}`
       );
       if (this.errorHandler) {
@@ -276,8 +383,10 @@ export class MCPFilesystemClient {
     this.operations.clear();
   }
 
+  // ========== Filesystem-Specific Methods ==========
+
   /**
-   * Execute batch operations (stub - actual implementation via MCP server)
+   * Execute batch operations
    */
   async batchOperations(params: {
     operations: any[];
@@ -287,21 +396,14 @@ export class MCPFilesystemClient {
       params.operations,
       params.atomic ?? true
     );
-    this.outputChannel.appendLine(`Batch operations recorded: ${operationId}`);
-    return {
-      status: "success",
-      operationId,
-      results: params.operations.map((op) => ({
-        type: op.type,
-        source: op.source,
-        destination: op.destination,
-        status: "completed",
-      })),
-    };
+    this.log("info", `Batch operations recorded: ${operationId}`);
+
+    const result = await this.callTool("fs_batch_operations", params);
+    return result;
   }
 
   /**
-   * Watch directory (stub - actual implementation via MCP server)
+   * Watch directory
    */
   async watchDirectory(params: {
     path: string;
@@ -313,17 +415,14 @@ export class MCPFilesystemClient {
       params.recursive ?? false,
       params.filters ?? []
     );
-    this.outputChannel.appendLine(`Watch session started: ${sessionId}`);
-    return {
-      status: "success",
-      sessionId,
-      path: params.path,
-      recursive: params.recursive ?? false,
-    };
+    this.log("info", `Watch session started: ${sessionId}`);
+
+    const result = await this.callTool("fs_watch_directory", params);
+    return { ...result, sessionId };
   }
 
   /**
-   * Get watch events (stub - actual implementation via MCP server)
+   * Get watch events
    */
   async getWatchEvents(params: { sessionId: string }): Promise<any> {
     try {
@@ -340,12 +439,9 @@ export class MCPFilesystemClient {
         }
         throw error;
       }
-      return {
-        status: "success",
-        sessionId: params.sessionId,
-        events: [],
-        eventCount: session.eventCount,
-      };
+
+      const result = await this.callTool("fs_get_watch_events", params);
+      return result;
     } catch (error: any) {
       if (this.errorHandler && !error.category) {
         this.errorHandler.handleError({
@@ -361,7 +457,7 @@ export class MCPFilesystemClient {
   }
 
   /**
-   * Search files (stub - actual implementation via MCP server)
+   * Search files
    */
   async searchFiles(params: {
     query: string;
@@ -377,52 +473,41 @@ export class MCPFilesystemClient {
       params.searchType ?? "name",
       params.fileTypes
     );
-    this.outputChannel.appendLine(`Search operation recorded: ${operationId}`);
-    return {
-      status: "success",
-      operationId,
-      query: params.query,
-      results: [],
-      resultCount: 0,
-    };
+    this.log("info", `Search operation recorded: ${operationId}`);
+
+    const result = await this.callTool("fs_search_files", params);
+    return result;
   }
 
   /**
-   * Build index (stub - actual implementation via MCP server)
+   * Build index
    */
   async buildIndex(params: {
     path: string;
     includeContent?: boolean;
   }): Promise<any> {
-    this.outputChannel.appendLine(`Building index for: ${params.path}`);
-    return {
-      status: "success",
-      path: params.path,
-      fileCount: 0,
-      totalSize: 0,
-      indexSize: 0,
-    };
+    this.log("info", `Building index for: ${params.path}`);
+    const result = await this.callTool("fs_build_index", params);
+    return result;
   }
 
   /**
-   * Create symlink (stub - actual implementation via MCP server)
+   * Create symlink
    */
   async createSymlink(params: {
     linkPath: string;
     targetPath: string;
   }): Promise<any> {
-    this.outputChannel.appendLine(
+    this.log(
+      "info",
       `Creating symlink: ${params.linkPath} -> ${params.targetPath}`
     );
-    return {
-      status: "success",
-      linkPath: params.linkPath,
-      targetPath: params.targetPath,
-    };
+    const result = await this.callTool("fs_create_symlink", params);
+    return result;
   }
 
   /**
-   * Compute checksum (stub - actual implementation via MCP server)
+   * Compute checksum
    */
   async computeChecksum(params: {
     path: string;
@@ -432,41 +517,27 @@ export class MCPFilesystemClient {
       params.path,
       params.algorithm ?? "sha256"
     );
-    this.outputChannel.appendLine(
-      `Checksum operation recorded: ${operationId}`
-    );
-    return {
-      status: "success",
-      operationId,
-      path: params.path,
-      algorithm: params.algorithm ?? "sha256",
-      checksum:
-        "0000000000000000000000000000000000000000000000000000000000000000",
-    };
+    this.log("info", `Checksum operation recorded: ${operationId}`);
+
+    const result = await this.callTool("fs_compute_checksum", params);
+    return result;
   }
 
   /**
-   * Verify checksum (stub - actual implementation via MCP server)
+   * Verify checksum
    */
   async verifyChecksum(params: {
     path: string;
     checksum: string;
     algorithm?: "md5" | "sha1" | "sha256" | "sha512";
   }): Promise<any> {
-    this.outputChannel.appendLine(`Verifying checksum for: ${params.path}`);
-    return {
-      status: "success",
-      path: params.path,
-      algorithm: params.algorithm ?? "sha256",
-      expectedChecksum: params.checksum,
-      actualChecksum:
-        "0000000000000000000000000000000000000000000000000000000000000000",
-      verified: false,
-    };
+    this.log("info", `Verifying checksum for: ${params.path}`);
+    const result = await this.callTool("fs_verify_checksum", params);
+    return result;
   }
 
   /**
-   * Analyze disk usage (stub - actual implementation via MCP server)
+   * Analyze disk usage
    */
   async analyzeDiskUsage(params: {
     path: string;
@@ -478,23 +549,14 @@ export class MCPFilesystemClient {
       params.depth,
       params.groupByType ?? false
     );
-    this.outputChannel.appendLine(
-      `Disk usage operation recorded: ${operationId}`
-    );
-    return {
-      status: "success",
-      operationId,
-      path: params.path,
-      totalSize: 0,
-      fileCount: 0,
-      directoryCount: 0,
-      largestFiles: [],
-      typeBreakdown: {},
-    };
+    this.log("info", `Disk usage operation recorded: ${operationId}`);
+
+    const result = await this.callTool("fs_analyze_disk_usage", params);
+    return result;
   }
 
   /**
-   * Copy directory (stub - actual implementation via MCP server)
+   * Copy directory
    */
   async copyDirectory(params: {
     source: string;
@@ -502,42 +564,58 @@ export class MCPFilesystemClient {
     preserveMetadata?: boolean;
     exclusions?: string[];
   }): Promise<any> {
-    this.outputChannel.appendLine(
+    this.log(
+      "info",
       `Copying directory: ${params.source} -> ${params.destination}`
     );
-    return {
-      status: "success",
-      source: params.source,
-      destination: params.destination,
-      filesCopied: 0,
-      bytesCopied: 0,
-      duration: 0,
-    };
+    const result = await this.callTool("fs_copy_directory", params);
+    return result;
   }
 
   /**
-   * Sync directory (stub - actual implementation via MCP server)
+   * Sync directory
    */
   async syncDirectory(params: {
     source: string;
     destination: string;
     exclusions?: string[];
   }): Promise<any> {
-    this.outputChannel.appendLine(
+    this.log(
+      "info",
       `Syncing directory: ${params.source} -> ${params.destination}`
     );
-    return {
-      status: "success",
-      source: params.source,
-      destination: params.destination,
-      filesCopied: 0,
-      filesSkipped: 0,
-      bytesCopied: 0,
-      duration: 0,
-    };
+    const result = await this.callTool("fs_sync_directory", params);
+    return result;
   }
 
   private generateOperationId(): string {
     return `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // Override callTool to handle MCP-specific response format
+  protected override async callTool(
+    name: string,
+    args: unknown
+  ): Promise<unknown> {
+    const result = (await this.sendRequest("tools/call", {
+      name,
+      arguments: args,
+    })) as any;
+
+    if (result.isError) {
+      throw new Error(result.content[0]?.text || "Tool call failed");
+    }
+
+    // Parse result content
+    const content = result.content[0]?.text;
+    if (content) {
+      try {
+        return JSON.parse(content);
+      } catch {
+        return content;
+      }
+    }
+
+    return result;
   }
 }
