@@ -1235,6 +1235,145 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Diagnostic commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "mcp-filesystem.reconnectToServer",
+      async () => {
+        if (!mcpClient) {
+          vscode.window.showErrorMessage(
+            "MCP ACS Filesystem server not running"
+          );
+          return;
+        }
+
+        try {
+          outputChannel.appendLine(
+            "Reconnecting to MCP ACS Filesystem server..."
+          );
+          const success = await mcpClient.reconnect();
+
+          if (success) {
+            vscode.window.showInformationMessage(
+              "Reconnected to MCP ACS Filesystem server"
+            );
+            outputChannel.appendLine("Reconnection successful");
+          } else {
+            vscode.window.showErrorMessage(
+              "Failed to reconnect to MCP ACS Filesystem server"
+            );
+            outputChannel.appendLine("Reconnection failed");
+          }
+        } catch (error: any) {
+          vscode.window.showErrorMessage(
+            `Reconnection error: ${error.message || error}`
+          );
+          outputChannel.appendLine(
+            `Reconnection error: ${error.message || error}`
+          );
+        }
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "mcp-filesystem.showDiagnostics",
+      async () => {
+        if (!mcpClient) {
+          vscode.window.showErrorMessage(
+            "MCP ACS Filesystem server not running"
+          );
+          return;
+        }
+
+        try {
+          const diagnostics = mcpClient.getDiagnostics();
+
+          // Show diagnostics in output channel
+          outputChannel.clear();
+          outputChannel.show(true);
+          outputChannel.appendLine("=".repeat(80));
+          outputChannel.appendLine("MCP ACS Filesystem Diagnostics");
+          outputChannel.appendLine("=".repeat(80));
+          outputChannel.appendLine("");
+          outputChannel.appendLine(`Extension: ${diagnostics.extensionName}`);
+          outputChannel.appendLine(
+            `Connection State: ${diagnostics.connectionState}`
+          );
+          outputChannel.appendLine(
+            `Process Running: ${diagnostics.processRunning ? "Yes" : "No"}`
+          );
+          if (diagnostics.processId) {
+            outputChannel.appendLine(`Process ID: ${diagnostics.processId}`);
+          }
+          outputChannel.appendLine("");
+          outputChannel.appendLine(
+            `Pending Requests: ${diagnostics.pendingRequestCount}`
+          );
+
+          if (diagnostics.pendingRequests.length > 0) {
+            outputChannel.appendLine("");
+            outputChannel.appendLine("Active Requests:");
+            for (const req of diagnostics.pendingRequests) {
+              outputChannel.appendLine(
+                `  - [${req.id}] ${req.method} (${req.elapsedMs}ms elapsed)`
+              );
+            }
+          }
+
+          if (diagnostics.lastError) {
+            outputChannel.appendLine("");
+            outputChannel.appendLine(
+              `Last Error: ${diagnostics.lastError.message}`
+            );
+            outputChannel.appendLine(
+              `  Timestamp: ${new Date(
+                diagnostics.lastError.timestamp
+              ).toISOString()}`
+            );
+          }
+
+          if (diagnostics.recentCommunication.length > 0) {
+            outputChannel.appendLine("");
+            outputChannel.appendLine("Recent Communication (last 10):");
+            const recent = diagnostics.recentCommunication.slice(-10);
+            for (const comm of recent) {
+              const timestamp = new Date(comm.timestamp).toISOString();
+              const status = comm.success ? "✓" : "✗";
+              const method = comm.method || "notification";
+              outputChannel.appendLine(
+                `  ${status} [${timestamp}] ${comm.type}: ${method}`
+              );
+            }
+          }
+
+          if (diagnostics.stateHistory.length > 0) {
+            outputChannel.appendLine("");
+            outputChannel.appendLine("State History (last 10):");
+            const history = diagnostics.stateHistory.slice(-10);
+            for (const state of history) {
+              const timestamp = new Date(state.timestamp).toISOString();
+              outputChannel.appendLine(
+                `  [${timestamp}] ${state.state}: ${state.message}`
+              );
+            }
+          }
+
+          outputChannel.appendLine("");
+          outputChannel.appendLine("=".repeat(80));
+        } catch (error: any) {
+          vscode.window.showErrorMessage(
+            `Failed to get diagnostics: ${error.message || error}`
+          );
+          outputChannel.appendLine(
+            `Failed to get diagnostics: ${error.message || error}`
+          );
+        }
+      }
+    )
+  );
+
   outputChannel.appendLine("MCP ACS Filesystem Manager extension activated");
 
   // Register with shared status bar
@@ -1257,6 +1396,21 @@ export async function activate(context: vscode.ExtensionContext) {
         label: "Security Boundaries",
         command: "mcp-filesystem.showSecurityBoundaries",
         description: "View security configuration",
+      },
+      {
+        label: "Reconnect to Server",
+        command: "mcp-filesystem.reconnectToServer",
+        description: "Reconnect to MCP server",
+      },
+      {
+        label: "Restart Server",
+        command: "mcp-filesystem.restartServer",
+        description: "Restart MCP server",
+      },
+      {
+        label: "Show Diagnostics",
+        command: "mcp-filesystem.showDiagnostics",
+        description: "Show server diagnostics",
       },
     ],
   });

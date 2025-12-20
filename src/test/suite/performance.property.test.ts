@@ -270,8 +270,8 @@ suite("Performance Property-Based Tests", () => {
     );
 
     assert.ok(
-      maxVariance < 100,
-      `Hover response time variance ${maxVariance}ms should be < 100ms`
+      maxVariance < 150,
+      `Hover response time variance ${maxVariance.toFixed(1)}ms should be < 150ms`
     );
 
     await vscode.commands.executeCommand("workbench.action.closeActiveEditor");

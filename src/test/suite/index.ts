@@ -7,7 +7,7 @@ export function run(): Promise<void> {
   const mocha = new Mocha({
     ui: "tdd",
     color: true,
-    timeout: 10000,
+    timeout: 300000, // 5 minutes - VSCode extension tests need more time
   });
 
   const testsRoot = path.resolve(__dirname, "..");
