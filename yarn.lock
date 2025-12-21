@@ -5,12 +5,12 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
-"@ai-capabilities-suite/mcp-client-base@npm:^1.0.0":
-  version: 1.0.0
-  resolution: "@ai-capabilities-suite/mcp-client-base@npm:1.0.0"
+"@ai-capabilities-suite/mcp-client-base@npm:1.0.1":
+  version: 1.0.1
+  resolution: "@ai-capabilities-suite/mcp-client-base@npm:1.0.1"
   peerDependencies:
     vscode: ^1.85.0
-  checksum: 10c0/a045db3ec3e505f3a7f19087f77ac9c254962809631be33dfb996a60032f4a9181322fe89862c2feba7055819c5afc35060da86012dcb55656957357a61386ea
+  checksum: 10c0/83bc5dd52fee1841030a2e087486debf0e9b812edc1335b487ed27fefad7dbb3cfb34ccfe0d14ac668ffd55169e740522cf3327ad7798cfb558056e220a95ffe
   languageName: node
   linkType: hard
 
@@ -3182,7 +3182,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "mcp-acs-filesystem@workspace:."
   dependencies:
-    "@ai-capabilities-suite/mcp-client-base": "npm:^1.0.0"
+    "@ai-capabilities-suite/mcp-client-base": "npm:1.0.1"
     "@ai-capabilities-suite/mcp-filesystem": "npm:^0.1.9"
     "@ai-capabilities-suite/vscode-shared-status-bar": "npm:^1.0.21"
     "@modelcontextprotocol/sdk": "npm:^1.23.0"
