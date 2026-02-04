@@ -854,7 +854,7 @@
     "@ai-capabilities-suite/mcp-client-base": "1.0.2",
     "@ai-capabilities-suite/mcp-filesystem": "^0.1.9",
     "@ai-capabilities-suite/vscode-shared-status-bar": "^1.0.21",
-    "@modelcontextprotocol/sdk": "^1.23.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "vscode-languageclient": "^10.0.0-next.15",
     "vscode-languageserver": "^10.0.0-next.15",
     "vscode-languageserver-textdocument": "^1.0.12"
