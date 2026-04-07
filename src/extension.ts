@@ -1377,7 +1377,7 @@ export async function activate(context: vscode.ExtensionContext) {
   outputChannel.appendLine("MCP ACS Filesystem Manager extension activated");
 
   // Register with shared status bar
-  await registerExtension("mcp-acs-filesystem", {
+  const regPromise = registerExtension("mcp-acs-filesystem", {
     displayName: "MCP Filesystem",
     status: "ok",
     settingsQuery: "mcp-filesystem",
@@ -1414,6 +1414,10 @@ export async function activate(context: vscode.ExtensionContext) {
       },
     ],
   });
+  Promise.race([
+    regPromise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('ACS registration timeout')), 5000)),
+  ]).catch((err) => console.error('[Filesystem] ACS registration:', err.message));
   context.subscriptions.push({
     dispose: () => unregisterExtension("mcp-acs-filesystem"),
   });
